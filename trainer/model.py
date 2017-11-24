@@ -6,10 +6,13 @@ slim = tf.contrib.slim
 feature_dim = 128
 
 def nldf(inputs, labels, feature_dim=feature_dim):
+    endpoints = {}
     with slim.arg_scope(vgg.vgg_arg_scope()):
-        endpoints = {}
         _, vg_end_points = vgg.vgg_16(inputs, spatial_squeeze=False)
+        vgg_initials = tf.contrib.framework.get_variables_to_restore(include=['vgg_16/conv'])
+        endpoints['vggs'] = vgg_initials
         
+    with tf.variable_scope('nldf'):
         global_feature_one = slim.repeat(vg_end_points['vgg_16/pool5'], 2, slim.conv2d, feature_dim, 5, padding='VALID')
 
         global_feature = slim.conv2d(global_feature_one, num_outputs=feature_dim, kernel_size=3, padding='VALID', scope='global_feature', activation_fn=None)
@@ -34,13 +37,6 @@ def nldf(inputs, labels, feature_dim=feature_dim):
         local_feature_pool2_up = slim.conv2d_transpose(tf.concat([contract_local_feature_pool2, local_feature_pool2, local_feature_pool3_up], axis=3), feature_dim*4, kernel_size=5, stride=2)
 
         local_feature = slim.conv2d(tf.concat([local_feature_pool1, contract_local_feature_pool1, local_feature_pool2_up], axis=3), num_outputs=feature_dim*5, kernel_size=[1, 1], padding='VALID', scope='lf')
-        endpoints['vggs'] = [
-                            vg_end_points['vgg_16/pool5'], 
-                            vg_end_points['vgg_16/pool4'], 
-                            vg_end_points['vgg_16/pool3'], 
-                            vg_end_points['vgg_16/pool2'], 
-                            vg_end_points['vgg_16/pool1']
-                            ]
         local_score = slim.conv2d(local_feature, num_outputs=1, kernel_size=[1, 1], padding='VALID', scope='ls')
         score = local_score + global_score
         prob = tf.nn.sigmoid(score)
