@@ -12,18 +12,72 @@ def nldf(inputs, labels, feature_dim=feature_dim):
         vgg_initials = tf.contrib.framework.get_variables_to_restore(include=['vgg_16/conv'])
         endpoints['vggs'] = vgg_initials
         
-    with tf.variable_scope('nldf'):
-        global_feature_one = slim.repeat(vg_end_points['vgg_16/pool5'], 2, slim.conv2d, feature_dim, 5, padding='VALID')
+        global_feature_one = slim.repeat(vg_end_points['vgg_16/pool5'], 
+                                        repetitions=2, 
+                                        layer=slim.conv2d, 
+                                        num_outputs=feature_dim, 
+                                        kernel_size=5, 
+                                        padding='VALID',
+                                        weights_initializer=tf.truncated_normal_initializer(0.01),
+                                        )
 
-        global_feature = slim.conv2d(global_feature_one, num_outputs=feature_dim, kernel_size=3, padding='VALID', scope='global_feature', activation_fn=None)
+        global_feature = slim.conv2d(global_feature_one, 
+                                     num_outputs=feature_dim, 
+                                     kernel_size=3, 
+                                     padding='VALID', 
+                                     scope='global_feature', 
+                                     weights_initializer=tf.truncated_normal_initializer(0.01),
+                                     activation_fn=None,
+                                     )
         
-        global_score = slim.conv2d(global_feature, num_outputs=1, kernel_size=[1, 1], padding='VALID')
+        global_score = slim.conv2d(global_feature, 
+                                   num_outputs=1, 
+                                   kernel_size=[1, 1], 
+                                   padding='VALID', 
+                                   weights_initializer=tf.truncated_normal_initializer(0.01),
+                                   activation_fn=None,
+                                   )
 
-        local_feature_pool5 = slim.conv2d(vg_end_points['vgg_16/pool5'], num_outputs=feature_dim, kernel_size=[3, 3], padding='SAME', scope='lp5')
-        local_feature_pool4 = slim.conv2d(vg_end_points['vgg_16/pool4'], num_outputs=feature_dim, kernel_size=[3, 3], padding='SAME', scope='lp4')
-        local_feature_pool3 = slim.conv2d(vg_end_points['vgg_16/pool3'], num_outputs=feature_dim, kernel_size=[3, 3], padding='SAME', scope='lp3')
-        local_feature_pool2 = slim.conv2d(vg_end_points['vgg_16/pool2'], num_outputs=feature_dim, kernel_size=[3, 3], padding='SAME', scope='lp2')
-        local_feature_pool1 = slim.conv2d(vg_end_points['vgg_16/pool1'], num_outputs=feature_dim, kernel_size=[3, 3], padding='SAME', scope='lp1')
+        local_feature_pool5 = slim.conv2d(
+                        vg_end_points['vgg_16/pool5'], 
+                        num_outputs=feature_dim, 
+                        kernel_size=[3, 3], 
+                        padding='SAME', 
+                        scope='lp5',
+                        weights_initializer=tf.truncated_normal_initializer(0.01),
+                        )
+        local_feature_pool4 = slim.conv2d(
+                        vg_end_points['vgg_16/pool4'], 
+                        num_outputs=feature_dim, 
+                        kernel_size=[3, 3], 
+                        padding='SAME', 
+                        scope='lp4',
+                        weights_initializer=tf.truncated_normal_initializer(0.01),
+                        )
+        local_feature_pool3 = slim.conv2d(
+                        vg_end_points['vgg_16/pool3'], 
+                        num_outputs=feature_dim, 
+                        kernel_size=[3, 3], 
+                        padding='SAME', 
+                        scope='lp3',
+                        weights_initializer=tf.truncated_normal_initializer(0.01),
+                        )
+        local_feature_pool2 = slim.conv2d(
+                        vg_end_points['vgg_16/pool2'], 
+                        num_outputs=feature_dim, 
+                        kernel_size=[3, 3], 
+                        padding='SAME', 
+                        scope='lp2',
+                        weights_initializer=tf.truncated_normal_initializer(0.01),
+                        )
+        local_feature_pool1 = slim.conv2d(
+                        vg_end_points['vgg_16/pool1'], 
+                        num_outputs=feature_dim, 
+                        kernel_size=[3, 3], 
+                        padding='SAME', 
+                        scope='lp1',
+                        weights_initializer=tf.truncated_normal_initializer(0.01),
+                        )
 
         contract_local_feature_pool5 = contrast_layer(local_feature_pool5)
         contract_local_feature_pool4 = contrast_layer(local_feature_pool4)
