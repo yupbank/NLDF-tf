@@ -1,5 +1,7 @@
 import tensorflow as tf
 import model
+import logging
+logger = logging.getLogger(__file__)
 
 
 slim = tf.contrib.slim
@@ -129,7 +131,7 @@ def main(_):
                 while True:
                     try:
                         _, dloss, daccuracy = sess.run([train_op, loss, accuracy])
-                        print i, j, dloss, daccuracy
+                        logging.info(i, j, dloss, daccuracy)
                         j += 1
                     except tf.errors.OutOfRangeError:
                         break
