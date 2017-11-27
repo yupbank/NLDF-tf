@@ -1,6 +1,9 @@
 import tensorflow as tf
 import model
 
+
+slim = tf.contrib.slim
+
 image_size = 352
 label_size = image_size/2
 train_dataset = 'train.txt'
@@ -12,6 +15,8 @@ tf.app.flags.DEFINE_string('checkpoint_dir', '/tmp/nldf-network',
 tf.app.flags.DEFINE_string('vgg_model_path', '/tmp/vgg-network',
                                    """Directory where to load vgg variables""")
 tf.app.flags.DEFINE_bool('restore_from_vgg', True,
+                                    """Restore from vgg""")
+tf.app.flags.DEFINE_bool('use_augmentation', True,
                                     """Restore from vgg""")
 tf.app.flags.DEFINE_string('dataset_location', '/Users/pengyu/Downloads/HKU-IS',
                                    """Directory where to the data""")
@@ -35,7 +40,7 @@ image_location = FLAGS.dataset_location+'/imgs'
 label_location = FLAGS.dataset_location+'/gt'
 
 
-def preprocess_image(file_name):
+def load_image(file_name):
     image = tf.image.decode_jpeg(tf.read_file(file_name), dct_method="INTEGER_ACCURATE")
     return tf.image.convert_image_dtype(image, tf.float32)
 
@@ -51,19 +56,40 @@ def prepare_label(image):
     label = tf.image.resize_images(image, (label_size, label_size))
     return label/255.
 
-
-def input_parser(file_name):
+def load_image_and_label(file_name):
     x = tf.string_join([image_location, file_name], '/')
     y = tf.string_join([label_location, file_name], '/')
-    x = prepare_image(preprocess_image(x))
-    y = prepare_label(preprocess_image(y))
+    return load_image(x), load_image(y)
+
+def input_parser(file_name):
+    x, y = load_image_and_label(file_name)
+    x = prepare_image(x)
+    y = prepare_label(y)
     return x, y
+
+def augmented_input_parser(file_name):
+    res = []
+    x_img, y_img = load_image_and_label(file_name)
+    x1 = prepare_image(x_img)
+    y1 = prepare_label(y_img)
+    res.append((x1, y1))
+
+    flipped_x = tf.image.flip_left_right(x_img)
+    flipped_y = tf.image.flip_left_right(y_img)
+
+    x2 = prepare_image(flipped_x)
+    y2 = prepare_label(flipped_y)
+    res.append((x2, y2))
+    return res
+
 
 def get_dataset(dataset_location=FLAGS.dataset_location, file_name=FLAGS.train_dataset, batch_size=FLAGS.batch_size):
     dataset = tf.string_join([dataset_location, file_name], '/')
     dataset = tf.contrib.data.TextLineDataset(dataset)
+
     dataset = dataset.map(input_parser)
-    dataset = dataset.shuffle(buffer_size=10)
+
+    dataset = dataset.shuffle(buffer_size=100)
     dataset = dataset.batch(batch_size)
     return dataset
 
@@ -77,24 +103,24 @@ def main(_):
 
         train_init_op = iterator.make_initializer(dataset)
 
+        prob, endpoints = model.nldf(inputs, labels)
 
-        with tf.device(device):
-            prob, endpoints = model.nldf(inputs, labels)
-            loss = endpoints['loss']
-            iou_loss = endpoints['iou_loss']
-            cross_entropy_loss = endpoints['cross_entropy_loss']
-            accuracy = endpoints['accuracy']
-            opt = tf.train.AdamOptimizer(1e-6)
-            tvars = tf.trainable_variables()
-            train_op = model.clip_grad(opt, loss, tvars, FLAGS.max_grad_norm)
+        vgg_variables = tf.contrib.framework.get_trainable_variables('vgg_16/conv')
+
+        loss = endpoints['loss']
+        accuracy = endpoints['accuracy']
+        optimizer = tf.train.AdamOptimizer(1e-6)
+        train_op = slim.learning.create_train_op(
+                          loss,
+                          optimizer,
+                          clip_gradient_norm=FLAGS.max_grad_norm)
 
         saver = tf.train.Saver(max_to_keep=4)
 
         with tf.Session() as sess:
-
             sess.run(tf.global_variables_initializer())
             if FLAGS.restore_from_vgg:
-                init_fn = tf.contrib.framework.assign_from_checkpoint_fn(FLAGS.vgg_model_path, endpoints['vggs'])
+                init_fn = tf.contrib.framework.assign_from_checkpoint_fn(FLAGS.vgg_model_path, vgg_variables)
                 init_fn(sess)
 
             for i in xrange(FLAGS.num_of_epoch):
@@ -102,11 +128,11 @@ def main(_):
                 j = 0
                 while True:
                     try:
-                        _, dloss, daccuracy, diou, d_cross = sess.run([train_op, loss, accuracy, iou_loss, cross_entropy_loss])
-                        print i, j, dloss, daccuracy, diou, d_cross
+                        _, dloss, daccuracy = sess.run([train_op, loss, accuracy])
+                        print i, j, dloss, daccuracy
                         j += 1
                     except tf.errors.OutOfRangeError:
-                        break 
+                        break
 
                 saver.save(sess, FLAGS.checkpoint_dir, global_step=i)
 
