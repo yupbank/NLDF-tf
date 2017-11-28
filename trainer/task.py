@@ -1,7 +1,6 @@
 import tensorflow as tf
 import model
 import logging
-logger = logging.getLogger(__file__)
 
 
 slim = tf.contrib.slim
@@ -105,7 +104,8 @@ def main(_):
 
         train_init_op = iterator.make_initializer(dataset)
 
-        prob, endpoints = model.nldf(inputs, labels)
+        with tf.device(tf.train.replica_device_setter()):
+            prob, endpoints = model.nldf(inputs, labels)
 
         vgg_variables = tf.contrib.framework.get_trainable_variables('vgg_16/conv')
 
@@ -119,7 +119,7 @@ def main(_):
 
         saver = tf.train.Saver(max_to_keep=4)
 
-        with tf.Session() as sess:
+        with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
             sess.run(tf.global_variables_initializer())
             if FLAGS.restore_from_vgg:
                 init_fn = tf.contrib.framework.assign_from_checkpoint_fn(FLAGS.vgg_model_path, vgg_variables)
@@ -131,7 +131,8 @@ def main(_):
                 while True:
                     try:
                         _, dloss, daccuracy = sess.run([train_op, loss, accuracy])
-                        logging.info(i, j, dloss, daccuracy)
+                        logging.warn('%s, %s, %s, %s'%(i, j, dloss, daccuracy))
+                        print i, j, dloss, daccuracy
                         j += 1
                     except tf.errors.OutOfRangeError:
                         break
