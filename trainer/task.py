@@ -104,7 +104,7 @@ def main(_):
 
         train_init_op = iterator.make_initializer(dataset)
 
-        with tf.device(tf.train.replica_device_setter()):
+        with tf.device(device):
             prob, endpoints = model.nldf(inputs, labels)
 
         vgg_variables = tf.contrib.framework.get_trainable_variables('vgg_16/conv')
