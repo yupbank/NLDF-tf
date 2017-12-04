@@ -39,6 +39,8 @@ device = '/gpu:0' if FLAGS.use_gpu else '/cpu:0'
 
 image_location = FLAGS.dataset_location+'/imgs'
 label_location = FLAGS.dataset_location+'/gt'
+writer_location = FLAGS.checkpoint_dir+'/eval'
+
 
 prepare_image = partial(model.prepare_image, image_size)
 prepare_label = partial(model.prepare_label, label_size)
@@ -91,22 +93,35 @@ def main(_):
         train_init_op = iterator.make_initializer(dataset)
 
         with tf.device(device):
-            prob, endpoints = model.loss(inputs, labels)
+            prob, end_points = model.loss(inputs, labels)
 
         vgg_variables = tf.contrib.framework.get_trainable_variables('vgg_16/conv')
 
-        loss = endpoints['loss']
-        accuracy = endpoints['accuracy']
+        total_loss = end_points['loss']
+        accuracy = end_points['accuracy']
         optimizer = tf.train.AdamOptimizer(1e-6)
         train_op = slim.learning.create_train_op(
-                          loss,
+                          total_loss,
                           optimizer,
                           clip_gradient_norm=FLAGS.max_grad_norm)
 
         saver = tf.train.Saver(max_to_keep=4)
+        summaries = set(tf.get_collection(tf.GraphKeys.SUMMARIES))
+        for end_point in end_points:
+            x = end_points[end_point]
+            summaries.add(tf.summary.histogram('activations/' + end_point, x))
+            summaries.add(tf.summary.scalar('sparsity/' + end_point,
+                            tf.nn.zero_fraction(x)))
+        for loss in tf.get_collection(tf.GraphKeys.LOSSES):
+            summaries.add(tf.summary.scalar('losses/%s' % loss.op.name, loss))
+        for variable in slim.get_model_variables():
+            summaries.add(tf.summary.histogram(variable.op.name, variable))
+        summaries.add(tf.summary.scalar('total_loss', total_loss))
+        summary_op = tf.summary.merge(list(summaries), name='summary_op')
 
         with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
             sess.run(tf.global_variables_initializer())
+            summary_writer = tf.summary.FileWriter(writer_location, sess.graph)
             if FLAGS.restore_from_vgg:
                 init_fn = tf.contrib.framework.assign_from_checkpoint_fn(FLAGS.vgg_model_path, vgg_variables)
                 init_fn(sess)
@@ -116,9 +131,13 @@ def main(_):
                 j = 0
                 while True:
                     try:
-                        _, dloss, daccuracy = sess.run([train_op, loss, accuracy])
-                        logging.warn('%s, %s, %s, %s'%(i, j, dloss, daccuracy))
-                        print i, j, dloss, daccuracy
+                        if j % 10 == 0:
+                            _, summary_str = sess.run([train_op, summary_op])
+                            summary_writer.add_summary(summary_str, j)
+                            summary_writer.flush()
+                        else:
+                            _, dloss, daccuracy = sess.run([train_op, total_loss, accuracy])
+                            logging.warn('%s, %s, %s, %s'%(i, j, dloss, daccuracy))
                         j += 1
                     except tf.errors.OutOfRangeError:
                         break

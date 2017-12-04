@@ -109,7 +109,6 @@ def local_global_score(pool5, pool4, pool3, pool2, pool1, feature_dim=feature_di
 
 
 def nldf(inputs, feature_dim=feature_dim):
-    endpoints = {}
     pool5, pool4, pool3, pool2, pool1 = load_vgg(inputs)
     local_score, global_score = local_global_score(pool5, pool4, pool3, pool2, pool1, feature_dim)
     score = local_score + global_score
@@ -117,6 +116,7 @@ def nldf(inputs, feature_dim=feature_dim):
 
 
 def loss(inputs, labels, feature_dim=feature_dim, contour_th=1.5):
+    endpoints = {}
     score = nldf(inputs, feature_dim)
 
     prob = tf.nn.sigmoid(score)
