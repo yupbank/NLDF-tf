@@ -1,7 +1,7 @@
 import tensorflow as tf
 import model
 import logging
-
+from functools import partial
 
 slim = tf.contrib.slim
 
@@ -40,27 +40,13 @@ device = '/gpu:0' if FLAGS.use_gpu else '/cpu:0'
 image_location = FLAGS.dataset_location+'/imgs'
 label_location = FLAGS.dataset_location+'/gt'
 
-
-def load_image(file_name):
-    image = tf.image.decode_jpeg(tf.read_file(file_name), dct_method="INTEGER_ACCURATE")
-    return tf.image.convert_image_dtype(image, tf.float32)
-
-
-def prepare_image(image):
-    image = tf.reverse(image, [-1])
-    image = tf.image.resize_images(image, (image_size, image_size))
-    image = image - tf.constant([103.939, 116.779, 123.68])
-    return image
-
-
-def prepare_label(image):
-    label = tf.image.resize_images(image, (label_size, label_size))
-    return label/255.
+prepare_image = partial(model.prepare_image, image_size)
+prepare_label = partial(model.prepare_label, label_size)
 
 def load_image_and_label(file_name):
     x = tf.string_join([image_location, file_name], '/')
     y = tf.string_join([label_location, file_name], '/')
-    return load_image(x), load_image(y)
+    return model.load_image(x), model.load_image(y)
 
 def input_parser(file_name):
     x, y = load_image_and_label(file_name)

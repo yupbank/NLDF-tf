@@ -5,6 +5,22 @@ slim = tf.contrib.slim
 
 feature_dim = 128
 
+def load_image(file_name):
+    image = tf.image.decode_jpeg(tf.read_file(file_name), dct_method="INTEGER_ACCURATE")
+    return tf.image.convert_image_dtype(image, tf.float32)
+
+
+def prepare_image(image_size, image):
+    image = tf.reverse(image, [-1])
+    image = tf.image.resize_images(image, (image_size, image_size))
+    image = image - tf.constant([103.939, 116.779, 123.68])
+    return image
+
+
+def prepare_label(label_size, image):
+    label = tf.image.resize_images(image, (label_size, label_size))
+    return label/255.
+
 
 def load_vgg(inputs):
     with slim.arg_scope(vgg.vgg_arg_scope()):
