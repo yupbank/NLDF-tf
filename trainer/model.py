@@ -1,9 +1,14 @@
 import tensorflow as tf
 from tensorflow.contrib.slim.python.slim.nets import vgg
 
+_R_MEAN = 123.68
+_G_MEAN = 116.78
+_B_MEAN = 103.94
+
 slim = tf.contrib.slim
 
 feature_dim = 128
+
 
 def load_image(file_name):
     image = tf.image.decode_jpeg(tf.read_file(file_name), dct_method="INTEGER_ACCURATE")
@@ -11,10 +16,8 @@ def load_image(file_name):
 
 
 def prepare_image(image_size, image):
-    image = tf.reverse(image, [-1])
     image = tf.image.resize_images(image, (image_size, image_size))
-    image = image - tf.constant([103.939, 116.779, 123.68])
-    return image
+    return image - [_R_MEAN, _G_MEAN, _B_MEAN]
 
 
 def prepare_label(label_size, image):
@@ -66,47 +69,51 @@ def local_global_score(pool5, pool4, pool3, pool2, pool1, feature_dim=feature_di
     with slim.arg_scope([slim.conv2d], padding='VALID',
                                        weights_initializer=tf.truncated_normal_initializer(stddev=0.01),
                                        biases_initializer=tf.constant_initializer(0.0)):
-        global_feature_one = slim.repeat(pool5, repetitions=2, layer=slim.conv2d, num_outputs=feature_dim, kernel_size=5, scope='gl_')
+        Fea_Global_2 = slim.repeat(pool5, repetitions=2, layer=slim.conv2d, num_outputs=feature_dim, kernel_size=5, scope='Fea_Global')
 
         with slim.arg_scope([slim.conv2d], activation_fn=None):
-            global_feature = slim.conv2d(global_feature_one, num_outputs=feature_dim, kernel_size=3, scope='gf')
-            global_score = slim.conv2d(global_feature, num_outputs=1, kernel_size=1, scope='gs',)
+            Fea_Global = slim.conv2d(Fea_Global_2, num_outputs=feature_dim, kernel_size=3, scope='Fea_Global')
+            Global_Score = slim.conv2d(Fea_Global, num_outputs=1, kernel_size=1, scope='Global_Score',)
 
         with slim.arg_scope([slim.conv2d], padding='SAME', kernel_size=3, num_outputs=feature_dim):
-            local_feature_pool5 = slim.conv2d(pool5, scope='lp5')
-            local_feature_pool4 = slim.conv2d(pool4, scope='lp4')
-            local_feature_pool3 = slim.conv2d(pool3, scope='lp3')
-            local_feature_pool2 = slim.conv2d(pool2, scope='lp2')
-            local_feature_pool1 = slim.conv2d(pool1, scope='lp1')
+            Fea_P5 = slim.conv2d(pool5, scope='Fea_P5')
+            Fea_P4 = slim.conv2d(pool4, scope='Fea_P4')
+            Fea_P3 = slim.conv2d(pool3, scope='Fea_P3')
+            Fea_P2 = slim.conv2d(pool2, scope='Fea_P2')
+            Fea_P1 = slim.conv2d(pool1, scope='Fea_P1')
 
-    contract_local_feature_pool5 = contrast_layer(local_feature_pool5)
-    contract_local_feature_pool4 = contrast_layer(local_feature_pool4)
-    contract_local_feature_pool3 = contrast_layer(local_feature_pool3)
-    contract_local_feature_pool2 = contrast_layer(local_feature_pool2)
-    contract_local_feature_pool1 = contrast_layer(local_feature_pool1)
+    Fea_P5_LC = contrast_layer(Fea_P5)
+    Fea_P4_LC = contrast_layer(Fea_P4)
+    Fea_P3_LC = contrast_layer(Fea_P3)
+    Fea_P2_LC = contrast_layer(Fea_P2)
+    Fea_P1_LC = contrast_layer(Fea_P1)
 
     with slim.arg_scope([slim.conv2d_transpose], kernel_size=5, stride=2):
-        local_feature_pool5_up = slim.conv2d_transpose(tf.concat([contract_local_feature_pool5, local_feature_pool5], axis=3),
-                                                       feature_dim)
-        local_feature_pool4_up = slim.conv2d_transpose(tf.concat([contract_local_feature_pool4, local_feature_pool4, local_feature_pool5_up], axis=3),
-                                                        feature_dim*2)
-        local_feature_pool3_up = slim.conv2d_transpose(tf.concat([contract_local_feature_pool3, local_feature_pool3, local_feature_pool4_up], axis=3),
-                                                        feature_dim*3)
-        local_feature_pool2_up = slim.conv2d_transpose(tf.concat([contract_local_feature_pool2, local_feature_pool2, local_feature_pool3_up], axis=3),
-                                                        feature_dim*4)
+        Fea_P5_Up = slim.conv2d_transpose(tf.concat([Fea_P5, Fea_P5_LC], axis=3),
+                                                       feature_dim,
+                                                       scope='Fea_P5_Deconv')
+        Fea_P4_Up = slim.conv2d_transpose(tf.concat([Fea_P4, Fea_P4_LC, Fea_P5_Up], axis=3),
+                                                        feature_dim*2,
+                                                        scope='Fea_P4_Deconv')
+        Fea_P3_Up = slim.conv2d_transpose(tf.concat([Fea_P3, Fea_P3_LC, Fea_P4_Up], axis=3),
+                                                        feature_dim*3,
+                                                        scope='Fea_P3_Deconv')
+        Fea_P2_Up = slim.conv2d_transpose(tf.concat([Fea_P2, Fea_P2_LC, Fea_P3_Up], axis=3),
+                                                        feature_dim*4,
+                                                        scope='Fea_P2_Deconv')
 
     with slim.arg_scope([slim.conv2d], padding='VALID',
                                        weights_initializer=tf.truncated_normal_initializer(stddev=0.01),
                                        biases_initializer=tf.constant_initializer(0.0),
                                        kernel_size=1,
                                        activation_fn=None):
-        local_feature = slim.conv2d(tf.concat([local_feature_pool1, contract_local_feature_pool1, local_feature_pool2_up], axis=3),
-                                    num_outputs=feature_dim*5, scope='lf')
+        Local_Fea = slim.conv2d(tf.concat([Fea_P1, Fea_P1_LC, Fea_P2_Up], axis=3),
+                                    num_outputs=feature_dim*5, 
+                                    scope='Local_Fea')
 
-        local_score = slim.conv2d(local_feature, num_outputs=1, scope='ls')
+        Local_Score = slim.conv2d(Local_Fea, num_outputs=1, scope='Local_Score')
 
-    return local_score, global_score
-
+    return Local_Score, Global_Score
 
 def nldf(inputs, feature_dim=feature_dim):
     pool5, pool4, pool3, pool2, pool1 = load_vgg(inputs)
@@ -131,9 +138,8 @@ def loss(scores, labels, contour_th=1.5):
 
     loss = cross_entropy_loss+iou_loss
     endpoints['loss'] = loss
-
-    correct_prediction = tf.equal(prob>0.5, labels>0.5)
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    
+    accuracy = tf.reduce_mean(tf.losses.absolute_difference(labels=labels, predictions=prob))
     endpoints['accuracy'] = accuracy
 
     return prob, endpoints

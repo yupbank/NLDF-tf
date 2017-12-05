@@ -142,6 +142,7 @@ def main(_):
                         else:
                             _, dloss, daccuracy = sess.run([train_op, total_loss, accuracy])
                             logging.info('Epoch: %s, Batch: %s, Loss: %s, Accuracy: %s'%(i, j, dloss, daccuracy))
+                            print('Epoch: %s, Batch: %s, Loss: %s, Accuracy: %s'%(i, j, dloss, daccuracy))
                         j += 1
                     except tf.errors.OutOfRangeError:
                         break
