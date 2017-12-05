@@ -19,7 +19,8 @@ def prepare_image(image_size, image):
 
 def prepare_label(label_size, image):
     label = tf.image.resize_images(image, (label_size, label_size))
-    return tf.where(label > 255*0.5, tf.ones_like(label), tf.zeros_like(label))
+    return label/255.0
+    #return tf.where(label > 255*0.5, tf.ones_like(label), tf.zeros_like(label))
 
 
 def load_vgg(inputs):
@@ -122,10 +123,12 @@ def loss(inputs, labels, feature_dim=feature_dim, contour_th=1.5):
     prob = tf.nn.sigmoid(score)
     endpoints['prob'] = prob 
 
-    cross_entropy_loss = tf.losses.sigmoid_cross_entropy(labels, score)
+    multi_class_labels = tf.where(labels > 0.0, tf.ones_like(labels), tf.zeros_like(labels))
+    cross_entropy_loss = tf.losses.sigmoid_cross_entropy(multi_class_labels = multi_class_labels, weights=labels, logits=score)
     endpoints['cross_entropy_loss'] = cross_entropy_loss
 
     iou_loss = cal_iou_loss(prob, labels, contour_th)
+    tf.losses.add_loss(iou_loss)
     endpoints['iou_loss'] = iou_loss
 
     loss = cross_entropy_loss+iou_loss
