@@ -19,7 +19,7 @@ def prepare_image(image_size, image):
 
 def prepare_label(label_size, image):
     label = tf.image.resize_images(image, (label_size, label_size))
-    return label/255.
+    return tf.where(label > 255*0.5, tf.ones_like(label), tf.zeros_like(label))
 
 
 def load_vgg(inputs):
