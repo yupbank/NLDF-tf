@@ -20,7 +20,6 @@ def prepare_image(image_size, image):
 def prepare_label(label_size, image):
     label = tf.image.resize_images(image, (label_size, label_size))
     return label/255.0
-    #return tf.where(label > 255*0.5, tf.ones_like(label), tf.zeros_like(label))
 
 
 def load_vgg(inputs):
@@ -36,11 +35,11 @@ def contrast_layer(feature_map, kernel_size=3):
     return feature_map - slim.avg_pool2d(padded_feature_map, [kernel_size, kernel_size], stride=1, padding='VALID')
 
 
-def solber_filter(feature_map):
-    solber_filter_x = tf.constant([1, 2, 1], dtype=tf.float32)
-    solber_filter_y = tf.constant([1, 0, -1], dtype=tf.float32)
-    x = tf.reshape(solber_filter_x, (3, 1)) * tf.reshape(solber_filter_y, (1, 3))
-    y = tf.reshape(solber_filter_y, (3, 1)) * tf.reshape(solber_filter_x, (1, 3))
+def sobel_filter(feature_map):
+    sobel_filter_x = tf.constant([1, 2, 1], dtype=tf.float32)
+    sobel_filter_y = tf.constant([1, 0, -1], dtype=tf.float32)
+    x = tf.reshape(sobel_filter_x, (3, 1)) * tf.reshape(sobel_filter_y, (1, 3))
+    y = tf.reshape(sobel_filter_y, (3, 1)) * tf.reshape(sobel_filter_x, (1, 3))
     x = tf.reshape(x, [3, 3, 1, 1])
     y = tf.reshape(y, [3, 3, 1, 1])
     padded_feature_map = tf.pad(feature_map, [[0, 0], [1, 1], [1, 1], [0, 0]], 'SYMMETRIC')
@@ -50,7 +49,7 @@ def solber_filter(feature_map):
 
 
 def cal_iou_loss(pred, gt, contour_th=1.5):
-    squash_channels = lambda r: tf.reduce_sum(solber_filter(r), 3, keep_dims=True)
+    squash_channels = lambda r: tf.reduce_sum(sobel_filter(r), 3, keep_dims=True)
     pred = squash_channels(pred)
     gt = squash_channels(gt)
 
@@ -116,15 +115,14 @@ def nldf(inputs, feature_dim=feature_dim):
     return score
 
 
-def loss(inputs, labels, feature_dim=feature_dim, contour_th=1.5):
+def loss(scores, labels, contour_th=1.5):
     endpoints = {}
-    score = nldf(inputs, feature_dim)
 
-    prob = tf.nn.sigmoid(score)
+    prob = tf.nn.sigmoid(scores)
     endpoints['prob'] = prob 
 
     multi_class_labels = tf.where(labels > 0.0, tf.ones_like(labels), tf.zeros_like(labels))
-    cross_entropy_loss = tf.losses.sigmoid_cross_entropy(multi_class_labels = multi_class_labels, weights=labels, logits=score)
+    cross_entropy_loss = tf.losses.sigmoid_cross_entropy(multi_class_labels = multi_class_labels, weights=labels, logits=scores)
     endpoints['cross_entropy_loss'] = cross_entropy_loss
 
     iou_loss = cal_iou_loss(prob, labels, contour_th)

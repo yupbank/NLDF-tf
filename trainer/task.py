@@ -93,7 +93,9 @@ def main(_):
         train_init_op = iterator.make_initializer(dataset)
 
         with tf.device(device):
-            prob, end_points = model.loss(inputs, labels)
+            scores = model.nldf(inputs)
+
+        prob, end_points = model.loss(scores, labels)
 
         vgg_variables = tf.contrib.framework.get_trainable_variables('vgg_16/conv')
 
@@ -117,6 +119,8 @@ def main(_):
         for variable in slim.get_model_variables():
             summaries.add(tf.summary.histogram(variable.op.name, variable))
         summaries.add(tf.summary.scalar('total_loss', total_loss))
+        summaries.add(tf.summary.image('Truth', labels*255.0))
+        summaries.add(tf.summary.image('Predicted', prob*255.0))
         summary_op = tf.summary.merge(list(summaries), name='summary_op')
 
         with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
@@ -137,7 +141,7 @@ def main(_):
                             summary_writer.flush()
                         else:
                             _, dloss, daccuracy = sess.run([train_op, total_loss, accuracy])
-                            logging.warn('%s, %s, %s, %s'%(i, j, dloss, daccuracy))
+                            logging.info('Epoch: %s, Batch: %s, Loss: %s, Accuracy: %s'%(i, j, dloss, daccuracy))
                         j += 1
                     except tf.errors.OutOfRangeError:
                         break
