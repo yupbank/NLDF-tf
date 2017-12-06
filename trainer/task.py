@@ -130,9 +130,9 @@ def main(_):
                 init_fn = tf.contrib.framework.assign_from_checkpoint_fn(FLAGS.vgg_model_path, vgg_variables)
                 init_fn(sess)
 
+            j = 0
             for i in xrange(FLAGS.num_of_epoch):
                 sess.run(train_init_op)
-                j = 0
                 while True:
                     try:
                         if j % 10 == 0:
@@ -142,7 +142,7 @@ def main(_):
                         else:
                             _, dloss, daccuracy = sess.run([train_op, total_loss, accuracy])
                             logging.info('Epoch: %s, Batch: %s, Loss: %s, Accuracy: %s'%(i, j, dloss, daccuracy))
-                            print('Epoch: %s, Batch: %s, Loss: %s, Accuracy: %s'%(i, j, dloss, daccuracy))
+                            #print('Epoch: %s, Batch: %s, Loss: %s, Accuracy: %s'%(i, j, dloss, daccuracy))
                         j += 1
                     except tf.errors.OutOfRangeError:
                         break

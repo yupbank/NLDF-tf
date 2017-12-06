@@ -129,7 +129,7 @@ def loss(scores, labels, contour_th=1.5):
     endpoints['prob'] = prob 
 
     multi_class_labels = tf.where(labels > 0.0, tf.ones_like(labels), tf.zeros_like(labels))
-    cross_entropy_loss = tf.losses.sigmoid_cross_entropy(multi_class_labels = multi_class_labels, weights=labels, logits=scores)
+    cross_entropy_loss = tf.losses.sigmoid_cross_entropy(multi_class_labels = multi_class_labels, logits=scores)
     endpoints['cross_entropy_loss'] = cross_entropy_loss
 
     iou_loss = cal_iou_loss(prob, labels, contour_th)
@@ -137,7 +137,7 @@ def loss(scores, labels, contour_th=1.5):
     endpoints['iou_loss'] = iou_loss
 
     loss = cross_entropy_loss+iou_loss
-    endpoints['loss'] = loss
+    endpoints['loss'] = cross_entropy_loss
     
     accuracy = tf.reduce_mean(tf.losses.absolute_difference(labels=labels, predictions=prob))
     endpoints['accuracy'] = accuracy
