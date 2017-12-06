@@ -119,6 +119,7 @@ def main(_):
         for variable in slim.get_model_variables():
             summaries.add(tf.summary.histogram(variable.op.name, variable))
         summaries.add(tf.summary.scalar('total_loss', total_loss))
+        summaries.add(tf.summary.image('Inputs', inputs))
         summaries.add(tf.summary.image('Truth', labels*255.0))
         summaries.add(tf.summary.image('Predicted', prob*255.0))
         summary_op = tf.summary.merge(list(summaries), name='summary_op')
