@@ -62,7 +62,7 @@ def cal_iou_loss(pred, gt, contour_th=1.5):
     inter = tf.reduce_sum(pred_filtered*gt_filtered, [1, 2, 3])
     union = tf.reduce_sum(tf.square(pred_filtered), [1, 2, 3]) + tf.reduce_sum(tf.square(gt_filtered), [1, 2, 3])
 
-    return tf.reduce_mean(tf.ones_like(inter) - 2 * inter / (union + 1))
+    return tf.reduce_mean(tf.ones_like(inter) - 2 * inter / (union + 1), name='iou_loss')
 
 
 def local_global_score(pool5, pool4, pool3, pool2, pool1, feature_dim=feature_dim):
@@ -137,7 +137,7 @@ def loss(scores, labels, contour_th=1.5):
     endpoints['iou_loss'] = iou_loss
 
     loss = cross_entropy_loss+iou_loss
-    endpoints['loss'] = cross_entropy_loss
+    endpoints['loss'] = loss
     
     accuracy = tf.reduce_mean(tf.losses.absolute_difference(labels=labels, predictions=prob))
     endpoints['accuracy'] = accuracy
